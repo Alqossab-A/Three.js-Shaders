@@ -2,6 +2,30 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.118/build/three.mod
 
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.118/examples/jsm/controls/OrbitControls.js';
 
+
+const _VS = `
+
+varying vec3 v_Normal;
+
+void main() {
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    v_Normal = normal;
+}
+`;
+
+const _FS = `
+
+uniform vec3 sphereColour;
+
+varying vec3 v_Normal;
+
+void main() {
+    // gl_FragColor = vec4(v_Normal, 1.0);
+    gl_FragColor = vec4(sphereColour, 1.0);
+}
+`
+
+
 class BasicWorldDemo {
     constructor() {
         this._Initialize();
@@ -71,26 +95,40 @@ class BasicWorldDemo {
 
         const plane = new THREE.Mesh(
             new THREE.PlaneGeometry(100, 100, 1, 1),
-            new THREE.MeshStandardMaterial({
-                color: 0xffffff,
-            })
+            new THREE.MeshStandardMaterial({ color: 0xffffff })
         );
         plane.castShadow = false;
         plane.receiveShadow = true;
         plane.rotation.x = -Math.PI / 2;
         this._scene.add(plane);
 
-        const box = new THREE.Mesh(
-            new THREE.BoxGeometry(2, 2, 2),
-            new THREE.MeshStandardMaterial({
-                color: 0x46464
+        const s1 = new THREE.Mesh(
+            new THREE.SphereGeometry(2, 32, 32),
+            new THREE.MeshStandardMaterial({ color: 0xffffff })
+        );
+        s1.position.set(-10, 5, 0);
+        s1.castShadow = true;
+        this._scene.add(s1);
+        
+        const s2 = new THREE.Mesh(
+            new THREE.SphereGeometry(2, 32, 32),
+            new THREE.ShaderMaterial({
+                uniforms: {
+                    sphereColour: {
+                        value: new THREE.Vector3(0, 0, 1)
+                    }
+                },
+                vertexShader: _VS,
+                fragmentShader: _FS,
             })
         );
-        box.position.set(0, 1, 0)
-        box.castShadow = true;
-        box.receiveShadow = true;
-        this._scene.add(box);
-        
+        s2.position.set(10, 5, 0);
+        s2.castShadow = true;
+        this._scene.add(s2);
+        this._sphere = s2;
+
+        this._totalTime = 0.0;
+
         this._RAF();
     }
 
@@ -101,10 +139,30 @@ class BasicWorldDemo {
     }
 
     _RAF() {
-        requestAnimationFrame(() => {
-            this._threejs.render(this._scene, this._camera);
+        requestAnimationFrame((t) => {
+            if (this._previousRAF === null) {
+                this._previousRAF = t;
+            }
+
             this._RAF();
+
+            this._threejs.render(this._scene, this._camera);
+            this._Step(t - this._previousRAF);
+            this._previousRAF = t;
         });
+    }
+
+    // still doesnt work
+    _Step(timeElapsed) {
+        const timeElapsedS = timeElapsed * 0.001;
+
+        this._totalTime += timeElapsedS;
+        const v = Math.sin(this._totalTime * 2.0) * 0.5 + 0.5;
+        const c1 = new THREE.Vector3(1, 0, 0);
+        const c2 = new THREE.Vector3(0, 1, 0);
+        const sphereColour = c1.lerp(c2, v);
+
+        this._sphere.material.uniforms.sphereColour.value = sphereColour;
     }
 }
 
